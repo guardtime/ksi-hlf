@@ -1,0 +1,23 @@
+- !!org.guardtime.Conf
+  aggrUrl: http://ksigw.test.ee.guardtime.com:8080/gt-signingservice
+  aggrKey: anon
+  aggrUser: anon
+
+  extUrl: http://ksigw.test.ee.guardtime.com:8081/gt-extendingservice
+  extKey: anon
+  extUser: anon
+
+#  pubfileUrl: http://verify.guardtime.com/ksi-publications.bin
+#  pubfileConstraint: E=publications@guardtime.com
+  pubfileUrl: http://nerf.ee.guardtime.com/cgi-bin/dummy-publications.bin
+  pubfileConstraint: E=internal@guardtime.com
+  pubfileCert: keystore.jks
+
+  network: mychannel
+  user: User1@org2.example.com
+  walletPath: ./wallet/
+  connectionProfile: ../gateway/connection-org2.yaml
+  commitOrg: gt
+
+  disabled: no
+
