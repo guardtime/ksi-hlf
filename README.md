@@ -11,7 +11,7 @@ Note that `KsiHlfContract` is packaged by the HLF tool `peer lifecycle chaincode
 
 ```
 # Go to project root.
-  cd ksi-fab-integration
+  cd ksi-hlf
 
 # Build the tools and prepare contract for packaging.
   mvn clean package
