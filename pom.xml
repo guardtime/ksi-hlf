@@ -1,37 +1,38 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" 
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
-  http://maven.apache.org/xsd/maven-4.0.0.xsd"> 
-  <modelVersion>4.0.0</modelVersion> <groupId>org.guardtime</groupId> 
-  <artifactId>ksi-hlf</artifactId> <version>0.0.1</version> 
-  <packaging>pom</packaging>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<modelVersion>4.0.0</modelVersion> <groupId>org.guardtime</groupId>
+<artifactId>ksi-hlf</artifactId> <version>0.0.1</version>
+<packaging>pom</packaging>
 
   <!-- Note that this project does not inherit anything -->
   <properties>
     <java.version>1.8</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<!-- HLF -->
+        <!-- HLF -->
     <fabric-chaincode-java.version>[2.0,3.0)</fabric-chaincode-java.version>
     <fabric-gateway-java.version>2.1.0</fabric-gateway-java.version>
-		<!-- Test -->
-		<junit.jupiter.version>5.3.0-RC1</junit.jupiter.version>
-		<junit.platform.version>1.3.0-RC1</junit.platform.version>
+        <!-- Test -->
+        <junit.jupiter.version>5.3.0-RC1</junit.jupiter.version>
+        <junit.platform.version>1.3.0-RC1</junit.platform.version>
 
     <ksi-java-sdk.version>4.16.205</ksi-java-sdk.version>
 
     <!-- Relative to the modules. -->
-		<ksihlf.contract.localrepo>../ksi-hlf-contract/internalrepo</ksihlf.contract.localrepo>
+        <ksihlf.contract.localrepo>../ksi-hlf-contract/internalrepo</ksihlf.contract.localrepo>
 
     <bouncycastle.version>1.65</bouncycastle.version>
   </properties>
 
-	<modules>
-		<module>ksi-hlf-wrapper</module>
-		<module>ledgerapi</module>
-		<module>ksi-hlf-util</module>
-		<module>ksi-hlf-contract</module>
-	</modules>
+    <modules>
+        <module>ksi-hlf-wrapper</module>
+        <module>ksi-hlf-ledgerapi</module>
+        <module>ksi-hlf-contract-api</module>
+        <module>ksi-hlf-util</module>
+        <module>ksi-hlf-contract</module>
+    </modules>
 
   <build>
     <sourceDirectory>src</sourceDirectory>

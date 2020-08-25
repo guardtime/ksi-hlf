@@ -68,17 +68,23 @@
     </dependency>
 
     <dependency>
+      <groupId>org.guardtime</groupId>
+      <artifactId>ksi-hlf-contract-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
       <groupId>org.hyperledger.fabric</groupId>
       <artifactId>fabric-gateway-java</artifactId>
       <version>${fabric-gateway-java.version}</version>
     </dependency>
 
     <!-- Needed for ASN1 -->
-		<dependency>
-			<groupId>org.bouncycastle</groupId>
-			<artifactId>bcpkix-jdk15on</artifactId>
-			<version>${bouncycastle.version}</version>
-		</dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk15on</artifactId>
+            <version>${bouncycastle.version}</version>
+        </dependency>
 
     <!-- Used for datatype annotations only -->
     <dependency>

@@ -38,7 +38,7 @@
   <dependencies>
     <dependency>
       <groupId>org.guardtime</groupId>
-      <artifactId>ledgerapi</artifactId>
+      <artifactId>ksi-hlf-ledgerapi</artifactId>
       <version>${project.version}</version>
    </dependency>
 
@@ -62,26 +62,26 @@
       <scope>compile</scope>
     </dependency>
 
-		<!-- Test Artifacts -->
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter-api</artifactId>
-			<version>${junit.jupiter.version}</version>
-			<scope>compile</scope>
-		</dependency>
+    <!-- Test Artifacts -->
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-api</artifactId>
+        <version>${junit.jupiter.version}</version>
+        <scope>compile</scope>
+    </dependency>
 
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter-params</artifactId>
-			<version>${junit.jupiter.version}</version>
-			<scope>test</scope>
-		</dependency>
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-params</artifactId>
+        <version>${junit.jupiter.version}</version>
+        <scope>test</scope>
+    </dependency>
 
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter-engine</artifactId>
-			<version>${junit.jupiter.version}</version>
-			<scope>test</scope>
-		</dependency>
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-engine</artifactId>
+        <version>${junit.jupiter.version}</version>
+        <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

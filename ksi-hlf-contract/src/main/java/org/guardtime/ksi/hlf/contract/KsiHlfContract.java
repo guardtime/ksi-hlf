@@ -1,11 +1,10 @@
-/*
-SPDX-License-Identifier: Apache-2.0
-*/
 package org.guardtime.ksi.hlf.contract;
 
 import java.util.Iterator;
 import java.util.logging.Logger;
 
+import com.google.common.util.concurrent.ExecutionError;
+import com.guardtime.ksi.exceptions.KSIException;
 import com.guardtime.ksi.hashing.DataHash;
 import com.guardtime.ksi.unisignature.KSISignature;
 
@@ -17,6 +16,7 @@ import org.hyperledger.fabric.contract.annotation.Default;
 import org.hyperledger.fabric.contract.annotation.Info;
 import org.hyperledger.fabric.contract.annotation.License;
 import org.hyperledger.fabric.contract.annotation.Transaction;
+import org.hyperledger.fabric.shim.ChaincodeException;
 import org.hyperledger.fabric.shim.ChaincodeStub;
 import org.hyperledger.fabric.shim.ledger.CompositeKey;
 import org.hyperledger.fabric.shim.ledger.KeyModification;
@@ -25,6 +25,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import org.guardtime.ksi.hlf.wrapper.KsiWrapper;
+import org.guardtime.ksi.hlf.wrapper.KsiWrapperException;
+import org.guardtime.ksi.hlf.ledgerapi.LedgerApiNoDataException;
+import org.guardtime.ksi.hlf.wrapper.ErrCodeEnum;
 /**
  * Define Guardtime KSI Signature smart contract.
  */
@@ -66,7 +69,7 @@ public class KsiHlfContract implements ContractInterface {
     }
 
     /**
-     * A dummy function for sanyty check that echos input string back.
+     * A dummy function for sanity check that echos input string back.
      * @param {Context} ctx is the transaction context.
      * @param {String} input is string that is echoed back.
      * @return A String.
@@ -117,6 +120,38 @@ public class KsiHlfContract implements ContractInterface {
         return ledgerKey.toString() + " = " + input;
     }
 
+    private static void validateInput(long blockNr, String org) {
+        if (blockNr < 0) {
+            throw new ChaincodeException("Block number must be > 0, but is " + blockNr + "!");
+        }
+        
+        if (org == null || org.isEmpty()) {
+            throw new ChaincodeException("Organization identifier must have value!");
+        }
+    }
+
+    private static void validateInput(long blockNr, String org, String base64ksig) {
+        validateInput(blockNr, org);
+        
+        if (base64ksig == null || base64ksig.isEmpty()) {
+            throw new ChaincodeException("KSI signature must have value!");
+        }
+    }
+
+    private static void validateInput(long blockNr, String org, String base64ksig, String[] recHash) {
+        validateInput(blockNr, org, base64ksig);
+        
+        if (recHash == null || recHash.length == 0) {
+            throw new ChaincodeException("KSI record hash list is empty!");
+        }
+
+        for (int i = 0; i < recHash.length; i++) {
+            if (recHash[i] == null || recHash[i].isEmpty()) {
+                throw new ChaincodeException("Record hash [" + i + "] must have value!");
+            }
+        }
+    }
+
     /**
      * This function is used to push a KSI signature related to the block to ledger.
      * Function takes block number, issuing organizations identifier and base64 encoded
@@ -146,22 +181,33 @@ public class KsiHlfContract implements ContractInterface {
         // https://www.edureka.co/community/2836/how-can-traverse-the-blocks-transactions-hyperledger-fabric
 
         System.out.println(ctx);
+        System.out.println("Parsing signature...");
 
-        System.out.println("Creating signature...");
-        
-        KsiWrapper sig = KsiWrapper.newFromBase64(base64ksig, recHash, blockNr, org);
+        validateInput(blockNr, org, base64ksig, recHash);
+        try {
+            KsiWrapper sig = KsiWrapper.newFromBase64(base64ksig, recHash, blockNr, org);
 
-        /*
-         * TODO: 1) Somehow get block by its nr. 2) Verify if KSI signature matches with
-         * the block.
+            /*
+            * TODO: 1) Somehow get block by its nr.
+            *       2) Verify if KSI signature matches with the block.
+            * 
          * 
-         * ... Dont know how to get a block!?!
-         */
-        System.out.println("Adding sig to list:");
+            * 
+         * 
+            * 
+            * ... Dont know how to get a block!?!
+            */
 
-        // Add the signature to the list.
-        ctx.ksiList.addKsiSignature(sig);
-        return sig;
+            System.out.println("Adding sig to list:");
+
+            // Add the signature to the list.
+            ctx.ksiList.addKsiSignature(sig);
+            return sig;
+        } catch (ChaincodeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ChaincodeException(e);
+        }
     }
 
     /**
@@ -181,9 +227,16 @@ public class KsiHlfContract implements ContractInterface {
      */
     @Transaction
     public KsiWrapper updateWithExtended(KSIContext ctx, long blockNr, String org, String base64extksig) {
-        KsiWrapper extSig = KsiWrapper.newFromBase64(base64extksig, blockNr, org);
-        ctx.ksiList.updateExtended(blockNr, org, extSig);
-        return extSig;
+        validateInput(blockNr, org, base64extksig);
+        try {
+            KsiWrapper extSig = KsiWrapper.newFromBase64(base64extksig, blockNr, org);
+            ctx.ksiList.updateExtended(blockNr, org, extSig);
+            return extSig;
+        } catch (ChaincodeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ChaincodeException(e);
+        }
     }
 
     /**
@@ -191,6 +244,9 @@ public class KsiHlfContract implements ContractInterface {
      * organization. It handles input parameters like {@link #setKsi(KSIContext, int, String, String) setKsi}
      * to construct ledger key.
      *
+     * In case of bad user input ChaincodeException is thrown (chaincode query will fail).
+     * If getting KSI signature fails, a payload 
+     * 
      * @param {Context} ctx is the transaction context.
      * @param {Integer} blockNr is the block number.
      * @param {String}  org is the organization identifier.
@@ -198,14 +254,16 @@ public class KsiHlfContract implements ContractInterface {
     @Transaction
     public String getKsi(KSIContext ctx, int blockNr, String org) {
         System.out.println("Getting signature...");
+        validateInput(blockNr, org);
 
         try {
             return ctx.ksiList.getKsiSignature(blockNr, org).toString();
+        } catch (LedgerApiNoDataException e) {
+            return "{}";
+        } catch (ChaincodeException e) {
+            throw e;
         } catch (Exception e) {
-            System.out.println("TODO: Filter out appropirate exceptions.");
-            System.out.println("TODO:" + e);
-            System.out.println("TODO END");
-            return "{\"ksig\":\"\", \"error\":\"" + e.toString() + "\"}";
+            throw new ChaincodeException(e);
         }
 
     }
@@ -221,8 +279,8 @@ public class KsiHlfContract implements ContractInterface {
      * index   - where 0 is the first value pushed to the state and N is the recent
      *           value.
      * 
-     * If key value is valid KSI signture it is parsed and its summary is printed
-     * containig following fields:
+     * If key value is valid KSI signature it is parsed and its summary is printed
+     * containing following fields:
      * sigtime - signing time.
      * pubtime - publication time if extended or empty string if not extended.
      * inhash  - input hash imprint.
@@ -239,6 +297,7 @@ public class KsiHlfContract implements ContractInterface {
     @Transaction
     public String getHistoryOfBlock(KSIContext ctx, int blockNr, String org) {
         System.out.println("Getting signature history...");
+        validateInput(blockNr, org);
         // String key = KsiWrapper.getKey(blockNr, org);
         String key = ctx.ksiList.getFullKey(KsiWrapper.getKey(blockNr, org));
         ChaincodeStub stub = ctx.getStub();
@@ -259,7 +318,7 @@ public class KsiHlfContract implements ContractInterface {
             item.put("index", "" + (count - i));
 
             try {
-                KsiWrapper sigw = KsiWrapper.deserialize(itr.next().getValue());
+                KsiWrapper sigw = new KsiWrapper().parse(itr.next().getValue());
                 KSISignature ksig = sigw.getKsi();
                 
                 ksig.getAggregationTime();
@@ -320,7 +379,8 @@ public class KsiHlfContract implements ContractInterface {
         JSONObject json = new JSONObject();
         JSONArray array = new JSONArray();
 
-
+        validateInput(blockMin, org);
+        validateInput(blockMax, org);
 
         for (i = blockMin; i < blockMax + 1; i++) {
             JSONObject item = new JSONObject();

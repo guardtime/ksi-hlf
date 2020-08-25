@@ -1,49 +1,38 @@
 package org.guardtime.ksi.hlf.contract;
 
-import org.example.ledgerapi.StateList;
+import org.guardtime.ksi.hlf.ledgerapi.StateList;
+import org.guardtime.ksi.hlf.ledgerapi.State;
+import org.guardtime.ksi.hlf.ledgerapi.LedgerApiException;
+import org.guardtime.ksi.hlf.ledgerapi.LedgerApiNoDataException;
 import org.hyperledger.fabric.contract.Context;
 
+import java.io.InvalidObjectException;
+
+import com.guardtime.ksi.exceptions.KSIException;
 import com.guardtime.ksi.unisignature.KSISignature;
 import org.hyperledger.fabric.shim.ChaincodeException;
 import org.guardtime.ksi.hlf.wrapper.KsiWrapper;
-/*
-SPDX-License-Identifier: Apache-2.0
-*/
 
 public class KsiList {
     private StateList stateList;
 
-    public KsiList(Context ctx) {
-        this.stateList = StateList.getStateList(ctx, "blocksig.ksi", KsiWrapper::deserialize);
+    public KsiList (Context ctx) {
+        this.stateList = new StateList(ctx, "blocksig.ksi", KsiWrapper::new);
     }
 
-    public KsiList addKsiSignature(KsiWrapper ksi) {
+    public KsiList addKsiSignature(KsiWrapper ksi) throws LedgerApiException {
         System.out.println("adding KSI signature:");
-        // String key = State.makeKey(new String[]{org, Long.toString(blockNr)});
-        
-        // System.out.println("Getting state from: " + ksi.getBlockNumber());
-        // State s = null;
-        // try {
-        //     s = stateList.getState(key);
-        //     System.out.println("State retrieved: " + s);
-        // } catch (Exception e) {;}
-        
-        // if (s != null) {
-        //     System.out.println("Ah Du liebe - state ist nonsence: " + s);
-        //     throw new ChaincodeException("KSI signature for this block already exists!");
-        // }
-
-        stateList.addState(ksi);
+        stateList.setState(ksi);
         return this;
     }
 
 
-    public KsiWrapper getKsiSignature(long blockNr, String org) {
+    public KsiWrapper getKsiSignature(long blockNr, String org) throws LedgerApiException, LedgerApiNoDataException {
         String key = KsiWrapper.getKey(blockNr, org);
         return (KsiWrapper) this.stateList.getState(key);
     }
 
-    public KsiList updateExtended(long blockNr, String org, KsiWrapper extended) {
+    public KsiList updateExtended(long blockNr, String org, KsiWrapper extended)  throws LedgerApiException, LedgerApiNoDataException {
         KsiWrapper prevSigwrap = getKsiSignature(blockNr, org);
         KSISignature prev = prevSigwrap.getKsi();
         KSISignature ext = extended.getKsi();
@@ -73,11 +62,11 @@ public class KsiList {
             tmp = KsiWrapper.newFromBase64(tmp.getKsiBase64(), prevSigwrap.getRecHash(), blockNr, org);
         }
 
-        this.stateList.updateState(tmp);
+        this.stateList.setState(tmp);
         return this;
     }
 
     public String getFullKey(String key) {
-        return stateList.getKey(key);
+        return stateList.getFullKey(key);
     } 
 }

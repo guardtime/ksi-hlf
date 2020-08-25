@@ -1,14 +1,12 @@
-// package org.guardtime.ksihlf;
 package org.guardtime.ksi.hlf.wrapper;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import java.util.Base64;
 import java.io.ByteArrayOutputStream;
 
-import org.example.ledgerapi.State;
+import org.guardtime.ksi.hlf.ledgerapi.State;
 import org.hyperledger.fabric.contract.annotation.DataType;
 import org.hyperledger.fabric.contract.annotation.Property;
-import org.hyperledger.fabric.shim.ChaincodeException;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONPropertyIgnore;
@@ -16,20 +14,17 @@ import org.json.JSONPropertyName;
 
 import com.guardtime.ksi.unisignature.KSISignature;
 import com.guardtime.ksi.SignatureReader;
+import com.guardtime.ksi.exceptions.KSIException;
 import com.guardtime.ksi.hashing.DataHash;
 
 import com.guardtime.ksi.tree.ImprintNode;
 import com.guardtime.ksi.tree.HashTreeBuilder;
 
 
-
-// /root/.m2/repository/org/hyperledger/fabric-chaincode-java/fabric-chaincode-shim
-// /root/.gradle/caches/modules-2/metadata-2.71/descriptors/org.hyperledger.fabric-chaincode-java/fabric-chaincode-shim
-
 /**
  * This is KSI Signature wrapper for holding KSI signature issued to HLF block.
  * KSI blocksigner is used to create a signature from block header and metadata
- * with local aggregation so that both components are idependendly verifyable.
+ * with local aggregation so that both components are independently verifiable.
  * 
  * This object is stored in ledger and is bound with one block. The object is
  * stored in JSON encoding:
@@ -42,6 +37,7 @@ import com.guardtime.ksi.tree.HashTreeBuilder;
  *  "rechash":  [<base64 str>], // Optional list of record hashes used in local
  *                              // aggregation. 
  *  "extended": <bool>          // Boolean value set true if "ksig" is extended.
+ *  "version":  <int>           // Version of the data struct (1).
  *  }
  * 
  * Notes:
@@ -71,39 +67,42 @@ public class KsiWrapper extends State {
     
     private DataHash[] recordHash;
     private KSISignature sig;
-    private static final long CURRENT_VERSION = 1;
+    private static final long CURRENT_VERSION = Version.VER_1;
 
     public static String getKey(long block, String org) {
-        return "." + org + "." + block;
+        if (org == null) throw new NullPointerException("Unable to construct KsiWrapper key as org is null!");
+        if (org.isEmpty()) throw new IllegalArgumentException("Unable to construct KsiWrapper key as org is empty string!");
+        if (block < 0) throw new IllegalArgumentException("Unable to construct KsiWrapper key as block " + block + " < 0!");
+        return org + "." + block;
     }
 
-    public static KsiWrapper newFromBase64(String base64, String[] recHash, long blockNumber, String org) {
+    public static KsiWrapper newFromBase64(String base64, String[] recHash, long blockNumber, String org) throws NullPointerException, IllegalArgumentException, KsiWrapperException {
         return newFromBin(CURRENT_VERSION, base64ToBin(base64), base64, recHash, blockNumber, org);
     }
 
-    public static KsiWrapper newFromBase64(String base64, long blockNumber, String org) {
-        return newFromBin(CURRENT_VERSION, base64ToBin(base64), base64, new String[0], blockNumber, org);
+    public static KsiWrapper newFromBase64(String base64, long blockNumber, String org) throws NullPointerException, IllegalArgumentException, KsiWrapperException {
+        return newFromBase64(base64, new String[0], blockNumber, org);
+        // return newFromBin(CURRENT_VERSION, base64ToBin(base64), base64, new String[0], blockNumber, org);
     }
     
-    public static KsiWrapper newFromKSI(KSISignature sig, DataHash[] recHash, long blockNumber, String org) {
-        if (blockNumber < 0) {
-            throw new ChaincodeException("Block number can not be negative! " + blockNumber);
-        } else if (org == null || org == "") {
-            throw new ChaincodeException("Org can not be null nor empty string!");
-        }
-        
+    public static KsiWrapper newFromKSI(KSISignature sig, DataHash[] recHash, long blockNumber, String org) throws NullPointerException, IllegalArgumentException, KsiWrapperException {
+        ByteArrayOutputStream arrayBuilder = new ByteArrayOutputStream(0x2000);
         try {
-            ByteArrayOutputStream arrayBuilder = new ByteArrayOutputStream(0x2000);
             sig.writeTo(arrayBuilder);
-            byte[] bin = arrayBuilder.toByteArray();
-            return newFromBin(CURRENT_VERSION, bin, binToBase64(bin), recordHashesToBase64(recHash), blockNumber, org);
-        } catch (Exception e) {
-            throw new ChaincodeException("Unable to parse KSI signature:" + e.toString());
+        } catch (KSIException e) {
+            throw new KsiWrapperException("Unable to serialize KSI signature!", ErrCodeEnum.ERR_KSI, e);
         }
+        byte[] bin = arrayBuilder.toByteArray();
+        return newFromBin(CURRENT_VERSION, bin, binToBase64(bin), recordHashesToBase64(recHash), blockNumber, org);
     }
 
-    public static KsiWrapper newFromKSI(KSISignature sig, long blockNumber, String org) {
+    public static KsiWrapper newFromKSI(KSISignature sig, long blockNumber, String org) throws NullPointerException, IllegalArgumentException, KsiWrapperException {
         return newFromKSI(sig, new DataHash[0], blockNumber, org);
+    }
+
+    @JSONPropertyIgnore
+    public KSISignature isInitialized() {
+        return sig;
     }
 
     @JSONPropertyIgnore
@@ -161,56 +160,77 @@ public class KsiWrapper extends State {
 
     @Override
     public String toString() {
-        byte[] tmp = KsiWrapper.serialize(this);
+        byte[] tmp = this.serialize();
         return new String(tmp, UTF_8);
     }
 
-    public static KsiWrapper deserialize(byte[] data) {
-        String j = new String(data, UTF_8);
-     
-        if (j.isEmpty()) {
-           throw new IllegalArgumentException("Empty base64 string can not be parsed to KSI signature.");
-        }
+    @Override
+    public KsiWrapper parse(byte[] data) throws RuntimeException {
+        KsiWrapper tmp = deserialize(data);
+        copy(tmp, this);
+        return this;
+    }
 
-        // System.out.println("==== KSI Wrapper in json ====");
-        // System.out.println("'" + j + "'");
-        // System.out.println("==== KSI Wrapper in json ====");
-
-        JSONObject json = new JSONObject(j);
-        long ver = json.getLong("ver");
-        if (ver != CURRENT_VERSION) {
-            throw new ChaincodeException("Unexpected version " + ver + ". Only version " + CURRENT_VERSION + " is supported.");
+    private static long getLong(JSONObject json, String key) throws KsiWrapperException {
+        try {
+            return json.getLong(key);
+        } catch (Exception e) {
+            throw new KsiWrapperException("Unable to parse KSI Wrapper object" + key + ": '" + json.getString(key) + "'!", ErrCodeEnum.ERR_INVALID_JSON_OBJECT, e);
         }
+    }
+
+    private static void checkMandatoryKey(JSONObject json, String key) throws KsiWrapperException {
+        if (!json.has(key)) {
+            throw new KsiWrapperException("KSI Wrapper object missing mandatory key '" + key + "'!", ErrCodeEnum.ERR_INVALID_JSON_OBJECT);
+        }
+    }
+
+    private static long checkVersion(JSONObject json) throws KsiWrapperException {
+        checkMandatoryKey(json, "ver");
+        long ver = getLong(json, "ver");
         
-        String state = json.getString("ksig");
-        long blockNumber = json.getLong("block");
-        String org = json.getString("org");
+        if (ver == Version.VER_1) {
+            checkMandatoryKey(json, "ksig");
+            checkMandatoryKey(json, "block");
+            getLong(json, "block");
+            checkMandatoryKey(json, "org");
+            checkMandatoryKey(json, "rechash");
+        } else {
+            throw new KsiWrapperException(
+                        "Unsupported KSI Wrapper version: " + ver + "! Supported versions: " + Version.getSupportedVersionsString() + ".",
+                        ErrCodeEnum.ERR_INVALID_OBJECT_VERSION);
+            
+        }
 
-        String[] recHash = new String[0];
-        if (json.has("rechash")) {
+        return ver;
+    }
+
+    private static String[] getRecHashList(JSONObject json, String key) {
+        try {
+            String[] recHash = new String[0];
             JSONArray jsonArray = json.getJSONArray("rechash");
             recHash = new String[jsonArray.length()];
+            if (jsonArray.length() == 0) {
+                throw new KsiWrapperException("Unable to parse KSI Wrapper object '" + key + "'! Array length is 0!", ErrCodeEnum.ERR_INVALID_JSON_OBJECT);
+            }
+            
             for (int i = 0; i < jsonArray.length(); i++) {
                 recHash[i] = jsonArray.getString(i);
             }
-        }
-
-        try {
-            return newFromBase64(state, recHash, blockNumber, org);
+            return recHash;
         } catch (Exception e) {
-            throw new ChaincodeException("Unable to parse KSI signature: " + e.toString());
+            throw new KsiWrapperException("Unable to parse KSI Wrapper object '" + key + "'!", ErrCodeEnum.ERR_INVALID_JSON_OBJECT, e);
         }
     }
 
-    public static byte[] serialize(KsiWrapper sig) {
-        return State.serialize(sig);
-    }
-
+    // public static byte[] serialize(KsiWrapper sig) {
+    //     return State.serialize(sig);
+    // }
 
     private static void verifyRecordHashes(KSISignature ksig, String[] recHash) {
-        if (recHash.length != 2) {
-            throw new ChaincodeException("The count of recordhashes must be 2, but is " + recHash.length);
-        }
+        // if (recHash.length == 0) {
+        //     throw new KsiWrapperException("The count of record hashes must be 2, but is " + recHash.length);
+        // }
         
         // System.out.println("Verifying KSI signature input hash.");
         DataHash headerHash = new DataHash(base64ToBin(recHash[0]));
@@ -224,41 +244,58 @@ public class KsiWrapper extends State {
         ImprintNode root = tb.build();
         DataHash rootHash = new DataHash(root.getValue());
 
-        // System.out.println("  Record hash 1    : " + headerHash);
-        // System.out.println("  Record hash 2    : " + fabricMetaDataHash);
-        // System.out.println("  Input hash calc. : " + rootHash);
-        // System.out.println("  Input hash       : " + ksig.getInputHash());
-
         if (!ksig.getInputHash().equals(rootHash)) {
-            throw new ChaincodeException("KSI Signature input hash calculated from recod hashes does not match with the signature!");
+            throw new KsiWrapperException("KSI Signature input hash calculated from record hashes does not match with the signature!", ErrCodeEnum.ERR_WRAP_VERIFICATION_FAILURE);
         }
 
         return;
     }
 
-    private static KsiWrapper newFromBin(long ver, byte[] bin, String base64, String[] recHash, long blockNumber, String org) {
+    /**
+     * Creates new KsiWrapper from binary input. Note that also base64 representation is needed for internal use.
+     * This approach is used to be able to create new wrapper from KSI signature or from base64 string.
+     * See {@link #newFromBase64} and {@link #newFromKsi} for public functions to construct wrapper.
+     * 
+     */
+    private static KsiWrapper newFromBin(long ver, byte[] bin, String base64, String[] recHash, long blockNumber, String org) throws KsiWrapperException {
+        if (bin == null) throw new NullPointerException("KSI signature binary array for parsing is null!");
+        if (bin.length == 0) throw new IllegalArgumentException("KSI signature binary array for parsing is empty!");
+        
+        if (base64 == null) throw new NullPointerException("KSI signature base64 representation is null!");
+        if (base64.isEmpty()) throw new IllegalArgumentException("KSI signature base64 representation is empty!");
+        
+        if (org == null) throw new NullPointerException("KSI signature wrapper org is null!");
+        if (org.isEmpty()) throw new IllegalArgumentException("KSI signature wrapper org is empty!");
+        
+        if (blockNumber < 0) throw new IllegalArgumentException("KSI signature wrapper block can not be negative!");
+
+        if (!Version.isSupported(ver)) throw new KsiWrapperException(
+            "Unsupported KSI Wrapper version: " + ver + "! Supported versions: " + Version.getSupportedVersionsString() + ".",
+            ErrCodeEnum.ERR_INVALID_OBJECT_VERSION);
+
+        KSISignature sig;
         try {
             SignatureReader rdr = new SignatureReader();
-            KSISignature sig = rdr.read(bin);
-            KsiWrapper tmp = new KsiWrapper();
-            
-            tmp.ksig = base64;
-            tmp.rechash = recHash;
-            tmp.extended = sig.isExtended();
-            tmp.block = blockNumber;
-            tmp.sig = sig;
-            tmp.key = KsiWrapper.getKey(blockNumber, org);
-            tmp.org = org;
-            tmp.ver = ver;
-
-            if (recHash != null && recHash.length != 0) {
-                verifyRecordHashes(sig, recHash);
-            }
-
-            return tmp;
+            sig = rdr.read(bin);
         } catch (Exception e) {
-            throw new ChaincodeException("Unable to parse KSI signature:" + e.toString());
+            throw new KsiWrapperException("Unable to parse KSI signature.", ErrCodeEnum.ERR_KSI, e);
         }
+        KsiWrapper tmp = new KsiWrapper();
+        
+        tmp.ksig = base64;
+        tmp.rechash = recHash;
+        tmp.extended = sig.isExtended();
+        tmp.block = blockNumber;
+        tmp.sig = sig;
+        tmp.key = KsiWrapper.getKey(blockNumber, org);
+        tmp.org = org;
+        tmp.ver = ver;
+
+        if (recHash != null && recHash.length != 0) {
+            verifyRecordHashes(sig, recHash);
+        }
+
+        return tmp;
     } 
 
     private static byte[] base64ToBin(String str) {
@@ -269,12 +306,55 @@ public class KsiWrapper extends State {
         return new String(Base64.getEncoder().encode(bin));
     }
 
-    private static String[] recordHashesToBase64(DataHash[] hshl) {
-        String[] tmp = new String[hshl.length];
-        for (int i = 0; i < hshl.length; i++) {
-          tmp[i] = binToBase64(hshl[i].getImprint());
+    private static String[] recordHashesToBase64(DataHash[] hshList) {
+        if (hshList == null) {
+            return null;
+        }
+
+        String[] tmp = new String[hshList.length];
+        for (int i = 0; i < hshList.length; i++) {
+            tmp[i] = binToBase64(hshList[i].getImprint());
         }
   
         return tmp;
+      }
+
+      private static void copy(KsiWrapper source, KsiWrapper target) {
+        target.block = source.block;
+        target.extended = source.extended;
+        target.key = source.key;
+        target.ksig = source.ksig;
+        target.org = source.org;
+        target.rechash = source.rechash;
+        target.recordHash = source.recordHash;
+        target.sig = source.sig;
+        target.ver = source.ver;
       } 
+
+      private static KsiWrapper deserialize(byte[] data) throws NullPointerException, IllegalArgumentException, KsiWrapperException {
+        if (data == null) throw new NullPointerException("Deserializing of " + KsiWrapper.class.getName() + " failed as input is null!");
+        if (data.length == 0) throw new IllegalArgumentException("Deserializing of " + KsiWrapper.class.getName() + " failed as input is empty!");
+        
+        String j = new String(data, UTF_8);
+     
+        JSONObject json = new JSONObject(j);
+
+        // Check and get version. Verify mandatory keys.
+        long ver = checkVersion(json);
+        
+        if (ver == Version.VER_1) {
+            String state = json.getString("ksig");
+            long blockNumber = getLong(json, "block");
+            String org = json.getString("org");
+            String[] recHash = getRecHashList(json, "rechash");
+        
+            try {
+                return newFromBase64(state, recHash, blockNumber, org);
+            } catch (Exception e) {
+                throw new KsiWrapperException("Unable to parse KSI signature!", ErrCodeEnum.ERR_UNEXPECTED, e);
+            }
+        } else {
+            throw new KsiWrapperException("Unexpected failure. Deserializing version: " + ver + " not implemented.", ErrCodeEnum.ERR_UNEXPECTED);
+        }
+    }
 }

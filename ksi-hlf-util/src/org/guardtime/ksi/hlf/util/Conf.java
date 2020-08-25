@@ -133,24 +133,6 @@ public class Conf {
         if (this.user == null || this.user.isEmpty()) throw new IllegalArgumentException("user is empty or null in conf nr. " + confNr);
     }
 
-    // static void ConfToFile(List<Conf> conf, String path) {
-    //     File outFile = new File(path);
-    //     Yaml yaml = new Yaml();
-    //     // StringWriter sw = new StringWriter();
-    //     // System.out.println("========");
-    //     // System.out.println(yaml.dump(conf));
-    //     // System.out.println("========");
-
-    //     try {
-    //         FileOutputStream out = new FileOutputStream(outFile);
-    //         out.write(yaml.dump(conf).getBytes());
-    //         out.close();
-    //     } catch (Exception e) {
-    //         //TODO: handle exception
-    //     }
-    // }
-
-
     public String getUser() {
         return this.user;
     }
