@@ -1,11 +1,11 @@
 # KSI HLF Integration
 
-This repository contains code for integrating KSI signatures into Hyperledger Fabric (HLF) via chaincode and HLF applications. KSI signatures are created by a daemon that listens for HLF new block events. After the new block is created it is signed by KSI and resulting signature with additional meta-data is committed to the ledger using the chaincode. This approach leverage KSI technology without changing the HLF source code.
+This repository contains code for integrating KSI signatures into Hyperledger Fabric (HLF) via chaincode and HLF applications. KSI signatures are created by a daemon that listens for HLF new block events. After a new block is created, it is signed by KSI and resulting signature with additional meta-data is committed to the ledger using the chaincode. This approach leverages KSI technology without changing the HLF source code.
 
 
 # How to build and install.
 
-Build is managed by maven. Calling `mvn clean package` should resolve all the dependencies and build the project. The build will produce a daemon for issuing KSI signatures (`KsiHlf`), a tool for verifying and extending KSI signatures (`KsiHlfTool`) and HLF smart contract (`KsiHlfContract` with chaincode name `org.guardtime.ksi.hlf.contract`).
+Build is managed by maven. Calling `mvn clean package` should resolve all the dependencies and build the project. The build will produce a daemon for issuing KSI signatures (`KsiHlf`), a tool for verifying and extending KSI signatures (`KsiHlfTool`) and a HLF smart contract (`KsiHlfContract` with chaincode name `org.guardtime.ksi.hlf.contract`).
 
 Note that `KsiHlfContract` is packaged by the HLF tool `peer lifecycle chaincode package` and is built on the peer node. In spite of that it is required to build entire project before packaging as the build will include some dependencies to the chaincode folder. See rough guidelines below how to build tools and install contract.
 
@@ -30,13 +30,16 @@ Note that `KsiHlfContract` is packaged by the HLF tool `peer lifecycle chaincode
 
 # Commit the chaincode to the channel.
   peer lifecycle chaincode commit <orderer info> <peer info>... <channel info> --name ksi-hlf-contract -v 1 --sequence 1 --waitForEvent
-
 ```
 
 
 # How to test.
 
-The simplest way to start testing `KsiHlf` is to set up HLF test network. See [HLF Getting Started](https://hyperledger-fabric.readthedocs.io/en/release-2.1/getting_started.html) to fulfill the prerequisites, install the sample binaries and run the test network. Follow examples and install `ksi-hlf-contract` using guidelines from example and from above. HLF example applications require a wallet (ID for the user) and connection profile to connect to the channel and invoke the chaincode. Extract the wallet and connection profile for using with `KsiHlf` and `KsiHlfTool`. Both tools use a common yaml configuration file. An example configuration file is:
+The simplest way to start testing `KsiHlf` is to set up HLF test network. See [HLF Getting Started](https://hyperledger-fabric.readthedocs.io/en/release-2.1/getting_started.html) to fulfill the prerequisites, install the sample binaries and run the test network. Follow the examples and install `ksi-hlf-contract` using guidelines from the example and from above. HLF example applications require a wallet (ID for the user) and connection profile to connect to the channel and invoke the chaincode. Extract the wallet and connection profile for using with `KsiHlf` and `KsiHlfTool`. Both tools use a common yaml configuration file.
+
+You also need access to KSI service. See [KSI Developer Program](https://guardtime.com/blockchain-developers) to get started.
+
+An example configuration file is:
 
 ```
 - !!org.guardtime.ksi.hlf.util.Conf
@@ -73,11 +76,10 @@ To test `KsiHlf` and see it signing the HLF blocks call:
 # Start KsiHlf using testConf.yaml.
 # Use HLF example project to invoke some chaincode that changes the ledger.
 # That change should generate a new HLF block that is going to be signed.
-
 java -cp ksi-hlf-util/target/ksi-hlf-util-0.0.1.jar org.guardtime.ksi.hlf.util.KsiHlf -c testConf.yaml -logcmd
 ```
 
-Example above signs the blocks created and displays the number of the bocks processed. These index values can be used by `KsiHlfTool` to verify and extend the KSI signatures issued.
+The example above signs the blocks created and displays the number of the bocks processed. These index values can be used by `KsiHlfTool` to verify and extend the KSI signatures issued:
 
 ```
 # Verify blocks 4, 5 and 6.
@@ -88,3 +90,4 @@ java -cp ksi-hlf-util/target/ksi-hlf-util-0.0.1.jar org.guardtime.ksi.hlf.util.K
 
 # Extend blocks 5 and 6 (note that extending can only be performed when a valid publication is published in publications file).
 java -cp ksi-hlf-util/target/ksi-hlf-util-0.0.1.jar org.guardtime.ksi.hlf.util.KsiHlfTool -c testConf.yaml -logcmd -sign -f 5 -l 6
+```
