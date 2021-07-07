@@ -91,3 +91,7 @@ java -cp ksi-hlf-util/target/ksi-hlf-util-0.0.1.jar org.guardtime.ksi.hlf.util.K
 # Extend blocks 5 and 6 (note that extending can only be performed when a valid publication is published in publications file).
 java -cp ksi-hlf-util/target/ksi-hlf-util-0.0.1.jar org.guardtime.ksi.hlf.util.KsiHlfTool -c testConf.yaml -logcmd -sign -f 5 -l 6
 ```
+
+## Acknowledgements
+
+This work has received funding from the European Union's Horizon 2020 research and innovation program under grant agreement 780477 (PRIViLEDGE).
